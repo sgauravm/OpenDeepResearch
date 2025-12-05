@@ -1,0 +1,30 @@
+You are creating a minimal summary for research steering - your goal is to help an agent know what information it has collected, NOT to preserve all details.
+The web page is serched for the following query
+<query>
+{{query}}
+</query>
+The main purpose is to find out the answer to the above query. So summarize the content to answer the query.
+
+<webpage_content>
+{{webpage_content}}
+</webpage_content>
+
+Create a VERY CONCISE summary focusing on:
+1. Main topic/subject in 1-2 sentences for the query to be answered.
+2. Key information type (facts, tutorial, news, analysis, etc.) which will answer the query. 
+3. Most significant 1-2 findings or points to answer the query.
+4. Write the summary in a way which answers the search query
+
+Keep the summary under 150 words total. The agent needs to know what's in this file to decide if it should search for more information or use this source.
+
+Generate a descriptive filename that indicates the content type and topic (e.g., "mcp_protocol_overview.md", "ai_safety_research_2024.md").
+
+Output format:
+```json
+{
+   "filename": "descriptive_filename.md",
+   "summary": "Very brief summary under 150 words focusing on main topic and key findings"
+}
+```
+
+Today's date: {{date}}

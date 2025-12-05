@@ -1,0 +1,115 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ---- Virtual Environments ----
+.venv/
+venv/
+env/
+ENV/
+.venv*/
+venv*/
+env*/
+
+# ---- Build / Distribution ----
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ---- Unit test / coverage reports ----
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# ---- Jupyter Notebook ----
+.ipynb_checkpoints
+*.ipynb~
+
+# ---- PyCharm / VSCode / Editors ----
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# ---- Logs and Debug ----
+*.log
+*.pot
+*.mo
+*.out
+*.err
+*.DS_Store
+
+# ---- Environment variables / Secrets ----
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cert
+secret.*
+
+# ---- Type checking / mypy / pyright ----
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyrightcache/
+
+# ---- Profiling ----
+.prof
+.profraw
+
+# ---- Mac / OS specific ----
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# ---- Docker ----
+docker-compose.override.yml
+*.pid
+
+# ---- Notebooks / Experiments ----
+outputs/
+logs/
+checkpoints/
+runs/
+wandb/
+mlruns/
+
+# ---- Local database / cache ----
+*.sqlite3
+*.db
+.db/
+*.bak
+
+# ---- Misc ----
+*.tmp
+*.swp
+*.swo
