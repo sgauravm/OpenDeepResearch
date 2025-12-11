@@ -3,7 +3,12 @@ from src.utils.helpers import get_today_str, get_prompt_template
 from src.deep_research_agent.state import AgentState, AgentInputState
 from pydantic import BaseModel, Field
 from src.config import ROOT_DIR
-from langchain_core.messages import HumanMessage, AIMessage, get_buffer_string
+from langchain_core.messages import (
+    HumanMessage,
+    AIMessage,
+    get_buffer_string,
+    SystemMessage,
+)
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 import os
@@ -63,7 +68,7 @@ def clarify_with_user(
     # Invoke the model with clarification instructions
     response = structured_output_model.invoke(
         [
-            HumanMessage(
+            SystemMessage(
                 content=CLARIFY_WITH_USER_PROMPT_TEMPLATE.render(
                     messages=get_buffer_string(messages=state["messages"]),
                     date=get_today_str(),
@@ -93,12 +98,12 @@ def write_research_brief(state: AgentState):
     and contains all necessary details for effective research.
     """
     # Set up structured output model
-    structured_output_model = model.with_structured_output(ResearchQuestion)
+    structured_output_model = MODEL.with_structured_output(ResearchQuestion)
 
     # Generate research brief from conversation history
     response = structured_output_model.invoke(
         [
-            HumanMessage(
+            SystemMessage(
                 content=WRITE_RESEARCH_BRIEF_PROMPT_TEMPLATE.render(
                     messages=get_buffer_string(state.get("messages", [])),
                     date=get_today_str(),
