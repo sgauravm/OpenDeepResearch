@@ -48,6 +48,10 @@ class ResearcherState(TypedDict):
     research_topic: str
     compressed_research: str
     raw_notes: Annotated[list[str], operator.add]
+    visited_urls: Annotated[list[str], operator.add]
+    num_web_search_calls: int
+    num_retry_llm_call_node: int
+    is_llm_call_error: bool
 
 
 class ResearcherOutputState(TypedDict):
@@ -61,3 +65,26 @@ class ResearcherOutputState(TypedDict):
     compressed_research: str
     raw_notes: Annotated[list[str], operator.add]
     researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
+
+
+class SupervisorState(TypedDict):
+    """
+    State for the multi-agent research supervisor.
+
+    Manages coordination between supervisor and research agents, tracking
+    research progress and accumulating findings from multiple sub-agents.
+    """
+
+    # Messages exchanged with supervisor for coordination and decision-making
+    supervisor_messages: Annotated[Sequence[BaseMessage], add_messages]
+    # Detailed research brief that guides the overall research direction
+    research_brief: str
+    # Processed and structured notes ready for final report generation
+    notes: Annotated[list[str], operator.add] = []
+    # Counter tracking the number of research iterations performed
+    research_iterations: int = 0
+    # Raw unprocessed research notes collected from sub-agent research
+    raw_notes: Annotated[list[str], operator.add] = []
+    num_retry_llm_call_node: int
+    is_llm_call_error: bool
+    research_iterations: int

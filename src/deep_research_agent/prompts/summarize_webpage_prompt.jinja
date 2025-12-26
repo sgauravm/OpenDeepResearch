@@ -1,6 +1,6 @@
-You are tasked with summarizing the raw content of a webpage retrieved from a web search. Your goal is to create a summary that preserves the most important information from the original web page. This summary will be used by a downstream research agent, so it's crucial to maintain the key details without losing essential information.
+You are tasked with summarizing the raw content of a webpage in markdown format retrieved from a web search. Your goal is to create a summary that preserves the most important information from the original web page. This summary will be used by a downstream research agent, so it's crucial to maintain the key details without losing essential information.
 
-Here is the raw content of the webpage:
+Here is the raw markdown format content of the webpage:
 
 <webpage_content>
 {{webpage_content}}
@@ -24,6 +24,8 @@ When handling different types of content:
 - For product pages: Keep key features, specifications, and unique selling points.
 
 Your summary should be significantly shorter than the original content but comprehensive enough to stand alone as a source of information. Aim for about 25-30 percent of the original length, unless the content is already concise.
+The summary or excerpt each should strictly be **less than 300 words**.
+**Do not repeat or loop text.**
 
 Present your summary in the following format:
 

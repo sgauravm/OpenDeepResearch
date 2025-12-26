@@ -1,7 +1,7 @@
 from typing_extensions import Annotated
 import ollama
 from ollama import WebSearchResponse
-from src.utils.models import MODEL
+from src.utils.models import get_model
 from src.utils.helpers import get_prompt_template, get_today_str
 from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage, ToolMessage
@@ -20,6 +20,7 @@ SUMMARIZE_WEB_SEARCH_TEMPLATE = get_prompt_template(
         "src/research_planning_offloading_agent/prompts/summarize_web_search.jinja",
     )
 )
+MODEL = get_model(reasoning="low")
 
 
 class Summary(BaseModel):

@@ -20,8 +20,6 @@ def get_llm(
        'gpt-oss' models and valid values are 'low', 'medium', 'high'.
     - **kwargs: Additional keyword arguments to pass to the ChatOllama constructor.
     """
-    if not reasoning and model_name.startswith("gpt-oss"):
-        reasoning = "low"
     if (
         model_name.startswith("gemma3")
         or model_name.startswith("llama3.1")
@@ -31,7 +29,11 @@ def get_llm(
         reasoning = None  # Gemma3 models do not support reasoning mode
 
     return ChatOllama(
-        model=model_name, temperature=temperature, reasoning=reasoning, **kwargs
+        model=model_name,
+        validate_model_on_init=True,
+        temperature=temperature,
+        reasoning=reasoning,
+        **kwargs,
     )
 
 
