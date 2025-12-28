@@ -77,9 +77,6 @@ If you prefer to set up everything manually or the script doesn't work for you, 
     The interactive script will guide you, or you can run these manually in a terminal:
     ```bash
     ollama run gpt-oss:20b
-    ollama run qwen3:30b
-    # Check for specific version tags if needed
-    ollama run nemotron-3-nano:30b
     ```
     *Note: Leaving `ollama run` will start a chat session; verify the model is pulled and then exit (Ctrl+D).*
 
