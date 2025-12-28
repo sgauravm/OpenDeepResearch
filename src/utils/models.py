@@ -53,9 +53,17 @@ def get_model(
     Returns:
     - ChatOllama: Configured ChatOllama instance.
     """
+    model_reasoning = reasoning
+    model_name = MODEL_CONFIG["model_name"]
+    if not model_name.startswith("gpt"):
+        if reasoning == "low":
+            model_reasoning = None
+        else:
+            model_reasoning = True
+
     return get_llm(
-        model_name=MODEL_CONFIG["model_name"],
+        model_name=model_name,
         temperature=temperature,
-        reasoning=reasoning,
+        reasoning=model_reasoning,
         **kwargs,
     )

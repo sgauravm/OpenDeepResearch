@@ -21,6 +21,7 @@ from src.deep_research_agent.tools.think_tool import think_tool
 from src.utils.helpers import get_prompt_template, get_today_str
 from src.config import ROOT_DIR
 from src.utils.models import get_model
+from src.types import ContentType
 
 
 class ResearcherAgent:
@@ -95,7 +96,13 @@ class ResearcherAgent:
     def compress_research(self, state: ResearcherState) -> dict:
         """Compress research messages into a summary."""
         writer = get_stream_writer()
-        writer({"type": "node_info", "message": "Compressing research findings."})
+        writer(
+            {
+                "content_type": ContentType.COMPRESSION_START,
+                "content": "Compressing research findings.",
+                "node_name": "compress_research",
+            }
+        )
 
         system_message = self.compress_research_system_prompt.render(
             date=get_today_str()
@@ -122,6 +129,13 @@ class ResearcherAgent:
                 state["researcher_messages"], include_types=["tool", "ai"]
             )
         ]
+        writer(
+            {
+                "content_type": ContentType.COMPRESSION_STOP,
+                "content": "Done compression of research findings",
+                "node_name": "compress_research",
+            }
+        )
 
         return {
             "compressed_research": str(response.content),

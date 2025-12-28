@@ -3,8 +3,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 MODEL_CONFIG = {
-    "model_name": "gpt-oss",
-    "temperature": None,
+    "model_name": "qwen3:30b",
+    "temperature": 0,
     "reasoning": None,
 }
 

@@ -145,20 +145,6 @@ class DeepResearchAgent:
             agent_reasoning=self.supervisor_reasoning,
         ).build_agent_graph()
 
-        config_val = config.get("configurable", {})
-        supervisor_config = {
-            "configurable": {
-                "thread_id": config_val["thread_id"],
-                "max_web_search_calls": config_val["max_web_search_calls"],
-                "max_web_search_results": config_val["max_web_search_results"],
-                "max_llm_call_retry": config_val["max_llm_call_retry"],
-                "max_researcher_iterations": config_val["max_researcher_iterations"],
-                "max_concurrent_researchers": config_val["max_concurrent_researchers"],
-                "interleaved_thinking": config_val["interleaved_thinking"],
-                "agent_reasoning": config_val["agent_reasoning"],
-            }
-        }
-
         supervisor_state = {
             "supervisor_messages": [
                 HumanMessage(content=state.get("research_brief", ""))

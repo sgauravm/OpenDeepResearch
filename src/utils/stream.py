@@ -94,7 +94,7 @@ async def response_generator_emulator(query: str, model: BaseChatModel | None = 
         time.sleep(0.5)
     if model:
         async for chunk in model.astream(query):
-            payload = {"content": chunk.content, "content_type": "stream_messages"}
+            payload = {"content": chunk, "content_type": "stream_messages"}
             yield payload
 
     else:
@@ -105,20 +105,21 @@ async def response_generator_emulator(query: str, model: BaseChatModel | None = 
 
 
 def run_async_generator(async_gen):
-    """Convert any async generator into a sync iterator."""
-
-    async def consume():
-        async for item in async_gen:
-            yield item
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    async_gen_instance = consume()
-
+    """Safely convert an async generator to sync for Streamlit."""
     try:
-        while True:
-            yield loop.run_until_complete(async_gen_instance.__anext__())
-    except StopAsyncIteration:
-        pass
-    finally:
-        loop.close()
+        # Check if there is already a running loop in this thread
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # If no loop exists, create a new one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    while True:
+        try:
+            # We use the loop to run the 'anext' task until it's finished
+            yield loop.run_until_complete(async_gen.__anext__())
+        except StopAsyncIteration:
+            break
+        except Exception as e:
+            # Log specific errors here if needed
+            raise e
