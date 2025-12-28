@@ -14,14 +14,6 @@ class ContentType(str, Enum):
     COMPRESSION_STOP = "compression_stop"
 
 
-class Payload(TypedDict):
-    content: Required[Any]
-    content_type: Required[ContentType]
-    agent_type: Required[str]
-    node_name: NotRequired[str]
-    tool_name: NotRequired[str]
-
-
 class AgentType(str, Enum):
     MAIN = "main"
     SUPERVISOR = "supervisor"

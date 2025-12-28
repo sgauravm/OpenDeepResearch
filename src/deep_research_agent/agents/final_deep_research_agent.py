@@ -50,7 +50,7 @@ class DeepResearchAgent:
         interleaved_thinking: bool = True,
     ):
         self.model = get_model(reasoning="medium")
-        self.writer_model = get_model(reasoning="medium")
+        self.writer_model = get_model(reasoning="low")
         self.supervisor_reasoning = agent_reasoning
         self.interleaved_thinking = interleaved_thinking
 
