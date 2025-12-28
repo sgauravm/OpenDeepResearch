@@ -50,7 +50,7 @@ We provide an interactive script to automate dependency installation, model setu
     - Install `uv` (if missing).
     - Install Python dependencies.
     - Set up Ollama models.
-    - Configure your API key.
+    - Configure your Ollama web_search API key.
     - Launch the app.
 
 ### Manual Setup
