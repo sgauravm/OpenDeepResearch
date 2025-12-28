@@ -4,7 +4,6 @@ import dotenv
 from typing import Dict
 from langchain_core.messages import HumanMessage
 
-# Assuming these are your custom modules
 try:
     from src.utils.stream import run_async_generator, StreamEventProcessor
     from src.config import FINAL_AGENT_CONFIG
@@ -18,7 +17,7 @@ except ImportError as e:
     )
     st.stop()
 
-# Load environment variables
+
 dotenv.load_dotenv()
 
 
@@ -171,10 +170,6 @@ class StreamlitUI:
             self.reason_placeholder.markdown(html, unsafe_allow_html=True)
 
 
-# ==========================================
-# 4. Main Application Loop
-# ==========================================
-
 
 def main():
     st.set_page_config(page_title="Deep Research Agent", layout="centered")
@@ -186,7 +181,7 @@ def main():
     ui.render_chat_history()
 
     # User Input
-    if prompt := st.chat_input("Type your query here..."):
+    if prompt := st.chat_input("Provide detailed research query..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
