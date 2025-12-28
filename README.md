@@ -20,7 +20,7 @@ This project is built using:
 ## Hardware Requirements
 
 This project relies on running large language models locally.
-- **Tested on**: Mac Studio M3 Ultra.
+- **Tested on**: Mac Studio M3 Ultra.(RAM: 96 GB (Unified Memory), CPU Core: 28, GPU Core: 60)
 - **Minimum Requirements**:
   - **RAM/VRAM**: Approximately **16GB+** is required to run the default `gpt-oss:20b` (4-bit quantized) model, which is about 14GB in size.
   - **Storage**: ~15-20GB free space for model weights.
