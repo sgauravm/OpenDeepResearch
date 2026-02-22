@@ -5,7 +5,7 @@ from typing import Annotated, Any, List, Literal
 import ollama
 from ollama import WebSearchResponse
 from pydantic import BaseModel, Field
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.types import Command
 from langchain.tools import ToolRuntime, tool
 from src.utils.models import get_model
@@ -35,6 +35,28 @@ class Summary(BaseModel):
     )
 
 
+class SummaryInfo(BaseModel):
+    description: str = Field(
+        description="1-2 line summary of what information is present in the content"
+    )
+    filename: str = Field(description="unique_short_filename_in_snake_case")
+
+
+def generate_summary_metadata(content: str, existing_names: str) -> SummaryInfo:
+    structured_model = MODEL.with_structured_output(SummaryInfo)
+    prompt_template_path = os.path.join(
+        ROOT_DIR, "src/deep_research_agent/prompts/summary_metadata_generator.jinja"
+    )
+    existing_names_str = "\n- ".join(existing_names)
+    existing_names_str = (
+        "- " + existing_names_str if existing_names else "" + existing_names_str
+    )
+    prompt_template = get_prompt_template(prompt_template_path)
+    prompt = prompt_template.render(content=content, existing_names=existing_names_str)
+    response = structured_model.invoke([SystemMessage(content=prompt)])
+    return response
+
+
 def ollama_search_multiple(
     search_queries: List[str], max_results: int = 2
 ) -> List[dict]:
@@ -58,6 +80,10 @@ def ollama_search_multiple(
     return search_docs
 
 
+def ollama_search_single(query: str, max_results: int = 2) -> WebSearchResponse:
+    return ollama.web_search(query, max_results=max_results)
+
+
 async def summarize_chunk(chunk: str):
     structured_model = MODEL.with_structured_output(Summary)
     return await structured_model.ainvoke(
@@ -75,8 +101,7 @@ async def summarize_long_content(
     content: str, chunk_size=2000, overlap_size=100
 ) -> Summary:
     chunks = split_text_by_words(content, chunk_size, overlap_size)
-    structured_model = MODEL.with_structured_output(Summary)
-
+    # TODO: Add semaphore to limit the number of concurrent requests to the model
     partials = await asyncio.gather(*[summarize_chunk(chunk) for chunk in chunks])
 
     combined_summary = "\n".join(p.summary for p in partials)
@@ -85,7 +110,7 @@ async def summarize_long_content(
     return Summary(summary=combined_summary, key_excerpts=combined_excerpts)
 
 
-async def summarize_webpage_content(webpage_content: str) -> str:
+async def summarize_webpage_content(webpage_content: str, title: str) -> str:
     """Summarize webpage content using the configured summarization model.
 
     Args:
@@ -110,8 +135,9 @@ async def summarize_webpage_content(webpage_content: str) -> str:
 
         # Format summary with clear structure
         formatted_summary = (
-            f"<summary>\n{summary.summary}\n</summary>\n\n"
-            f"<key_excerpts>\n{summary.key_excerpts}\n</key_excerpts>"
+            f"Title:\n{title}\n\n"
+            f"Summary:\n{summary.summary}\n\n"
+            f"Key Excerpts:\n{summary.key_excerpts}\n"
         )
 
         return formatted_summary
@@ -145,11 +171,13 @@ def deduplicate_search_results(search_results: List[WebSearchResponse]) -> dict:
     return unique_results
 
 
-async def process_search_results(unique_results: dict[str, Any]) -> dict[str, Any]:
+async def process_search_results(
+    unique_results: dict[str, Any],
+) -> dict[str, dict[str, dict]]:
     """Process search results by summarizing content in parallel."""
 
     async def process_single(url: str, result: Any):
-        content = await summarize_webpage_content(result.content)
+        content = await summarize_webpage_content(result.content, result.title)
         return url, {"title": result.title, "content": content}
 
     # Create a list of coroutines
@@ -187,11 +215,10 @@ def format_search_output(summarized_results: dict) -> str:
     return formatted_output
 
 
-def _get_non_visited_urls(visted_urls, search_results):
-    for url in visted_urls:
-        if url in search_results:
-            del search_results[url]
-    return search_results
+def _get_non_visited_urls(visited_urls: list[str], search_results: dict) -> dict:
+    """Filter out URLs that have already been visited from search results."""
+    visited_set = set(visited_urls)
+    return {url: result for url, result in search_results.items() if url not in visited_set}
 
 
 class ToolRuntimeModel(BaseModel):
@@ -204,13 +231,13 @@ async def web_search(
     query: str,
     runtime: ToolRuntime,
 ):
-    """Fetch results from ollama web search API with content summarization.
+    """Search the web and save full content. Returns brief summaries of what each source contains—not the raw content. Use these summaries to assess coverage and decide whether to search again.
 
     Args:
-        query: A single search query to execute
+        query: Search query to execute
 
     Returns:
-        Formatted string of search results with summaries
+        Summaries describing what information is in each saved source
     """
     # Getting context data
     max_results = runtime.config.get("configurable", {}).get(
@@ -224,7 +251,7 @@ async def web_search(
     num_web_search_calls += 1
     # Checking for max tool call limit
     if num_web_search_calls > max_web_search_calls:
-        return f"Maximum number of web search calls ({max_web_search_calls}) reached. Cannot perform more searches. Answer based on the information collected so far."
+        return f"Maximum number of web search calls ({max_web_search_calls}) reached. Cannot perform more searches. Call research_complete to indicate that you are done with your research."
 
     writer = get_stream_writer()
     writer(
@@ -243,11 +270,11 @@ async def web_search(
     unique_results = deduplicate_search_results(search_results)
 
     # Exclude already visited URLs
-    unique_result = _get_non_visited_urls(
+    unique_results = _get_non_visited_urls(
         runtime.state.get("visited_urls", []), unique_results
     )
 
-    if len(unique_result) == 0:
+    if len(unique_results) == 0:
         tool_message = "No new search results found. All URLs have been previously visited. Try a different query."
         return Command(
             update={
@@ -263,14 +290,33 @@ async def web_search(
         )
 
     # Process results with summarization
+    # Output: key=url, value=dict with title and content
     summarized_results = await process_search_results(unique_results)
 
-    # Format output for consumption
-    tool_message = format_search_output(summarized_results)
+    new_research_notes = {}
+    new_urls = []
+    tool_message = (
+        f"Web search completed. Full content from {len(summarized_results)} source(s) has been saved. "
+        "Use these summaries to decide your next step:\n\n"
+    )
+    for url, result in summarized_results.items():
+        summary_info = generate_summary_metadata(
+            result["content"], list(runtime.state.get("research_notes", {}).keys())
+        )
+        new_research_notes[summary_info.filename] = {
+            "title": result["title"],
+            "content": result["content"],
+            "description": summary_info.description,
+            "url": url,
+        }
+        new_urls.append(url)
+        # TODO: if this does not work well can add url and title to the description
+        tool_message += f"- {summary_info.description}\n"
 
     return Command(
         update={
-            "visited_urls": list(summarized_results.keys()),
+            "visited_urls": new_urls,
+            "research_notes": new_research_notes,
             "researcher_messages": [
                 ToolMessage(
                     content=tool_message,

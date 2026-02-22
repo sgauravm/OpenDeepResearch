@@ -3,12 +3,7 @@
 from typing import Literal
 from pydantic import BaseModel
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import (
-    SystemMessage,
-    HumanMessage,
-    ToolMessage,
-    filter_messages,
-)
+from langchain_core.messages import HumanMessage, SystemMessage, filter_messages
 from langchain.chat_models import init_chat_model
 from langgraph.config import get_stream_writer
 from langgraph.prebuilt import ToolNode
@@ -18,6 +13,7 @@ from langchain_core.runnables import RunnableConfig
 from src.deep_research_agent.state import ResearcherOutputState, ResearcherState
 from src.deep_research_agent.tools.search_tool import web_search
 from src.deep_research_agent.tools.think_tool import think_tool
+from src.deep_research_agent.tools.research_complete_tool import research_complete
 from src.utils.helpers import get_prompt_template, get_today_str
 from src.config import ROOT_DIR
 from src.utils.models import get_model
@@ -37,18 +33,10 @@ class ResearcherAgent:
             ROOT_DIR
             / "src/deep_research_agent/prompts/research_agent_system_prompt.jinja"
         )
-        self.compress_research_system_prompt = get_prompt_template(
-            ROOT_DIR
-            / "src/deep_research_agent/prompts/compress_research_system_prompt.jinja"
-        )
-        self.compress_research_human_prompt = get_prompt_template(
-            ROOT_DIR
-            / "src/deep_research_agent/prompts/compress_research_human_prompt.jinja"
-        )
         self.interleaved_thinking = interleaved_thinking
 
         # Initialize tools
-        self.tools = [web_search]
+        self.tools = [web_search, research_complete]
         if self.interleaved_thinking:
             self.tools.append(think_tool)
 
@@ -60,8 +48,6 @@ class ResearcherAgent:
         # Initialize models
         self.model = get_model(reasoning=agent_reasoning)
         self.model_with_tools = self.model.bind_tools(self.tools)
-        self.summarization_model = get_model()
-        self.compress_model = get_model(max_tokens=32000)
 
     # ===== Node Implementations =====
     def llm_call(self, state: ResearcherState) -> dict:
@@ -94,51 +80,49 @@ class ResearcherAgent:
             }
 
     def compress_research(self, state: ResearcherState) -> dict:
-        """Compress research messages into a summary."""
+        """Concatenate all collected content from research_notes for the supervisor."""
         writer = get_stream_writer()
         writer(
             {
                 "content_type": ContentType.COMPRESSION_START,
-                "content": "Compressing research findings.",
+                "content": "Assembling research findings.",
                 "node_name": "compress_research",
             }
         )
 
-        system_message = self.compress_research_system_prompt.render(
-            date=get_today_str()
-        )
-        researcher_messages = state.get("researcher_messages", [])
-        if len(researcher_messages) > 0:
-            researcher_messages = researcher_messages[:-1]
-        messages = (
-            [SystemMessage(content=system_message)]
-            + researcher_messages
-            + [
-                HumanMessage(
-                    content=self.compress_research_human_prompt.render(
-                        research_topic=state["research_topic"]
-                    )
-                )
-            ]
-        )
+        research_notes = state.get("research_notes", {})
+        descriptions = [
+            f"{filename}: {note.get('description', '')}"
+            for filename, note in research_notes.items()
+            if isinstance(note, dict) and note.get("description")
+        ]
 
-        response = self.compress_model.invoke(messages)
+        if descriptions:
+            compressed_research = (
+                "=== INFORMATION COLLECTED BY RESEARCH AGENT ===\n\n"
+                + "\n".join(f"- {d}" for d in descriptions)
+            )
+        else:
+            compressed_research = "=== INFORMATION COLLECTED BY RESEARCH AGENT ===\n\nNo content collected."
+
+        # TODO: This might not be required
         raw_notes = [
             str(m.content)
             for m in filter_messages(
                 state["researcher_messages"], include_types=["tool", "ai"]
             )
         ]
+
         writer(
             {
                 "content_type": ContentType.COMPRESSION_STOP,
-                "content": "Done compression of research findings",
+                "content": "Done assembling research findings",
                 "node_name": "compress_research",
             }
         )
 
         return {
-            "compressed_research": str(response.content),
+            "compressed_research": compressed_research,
             "raw_notes": ["\n".join(raw_notes)],
             "num_web_search_calls": 0,
         }
@@ -158,6 +142,9 @@ class ResearcherAgent:
                 return "llm_call"
 
         if last_message.tool_calls:
+            for tool_call in last_message.tool_calls:
+                if tool_call.get("name", "") == "research_complete":
+                    return "compress_research"
             return "tool_node"
 
         return "compress_research"

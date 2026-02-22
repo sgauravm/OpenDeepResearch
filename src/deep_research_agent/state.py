@@ -32,6 +32,12 @@ class AgentState(MessagesState):
     notes: Annotated[list[str], operator.add] = []
     # Final formatted research report
     final_report: str
+    research_notes: Annotated[dict[str, dict[str, dict]], add_dict]
+    visited_urls: Annotated[list[str], operator.add]
+
+
+def add_dict(dict1: dict, dict2: dict) -> dict:
+    return {**dict1, **dict2}
 
 
 class ResearcherState(TypedDict):
@@ -47,11 +53,11 @@ class ResearcherState(TypedDict):
     tool_call_iterations: int
     research_topic: str
     compressed_research: str
-    raw_notes: Annotated[list[str], operator.add]
     visited_urls: Annotated[list[str], operator.add]
     num_web_search_calls: int
     num_retry_llm_call_node: int
     is_llm_call_error: bool
+    research_notes: Annotated[dict[str, dict[str, dict]], add_dict]
 
 
 class ResearcherOutputState(TypedDict):
@@ -63,8 +69,9 @@ class ResearcherOutputState(TypedDict):
     """
 
     compressed_research: str
-    raw_notes: Annotated[list[str], operator.add]
     researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
+    research_notes: Annotated[dict[str, dict[str, dict]], add_dict]
+    visited_urls: Annotated[list[str], operator.add]
 
 
 class SupervisorState(TypedDict):
@@ -79,12 +86,25 @@ class SupervisorState(TypedDict):
     supervisor_messages: Annotated[Sequence[BaseMessage], add_messages]
     # Detailed research brief that guides the overall research direction
     research_brief: str
-    # Processed and structured notes ready for final report generation
-    notes: Annotated[list[str], operator.add] = []
+
     # Counter tracking the number of research iterations performed
     research_iterations: int = 0
-    # Raw unprocessed research notes collected from sub-agent research
-    raw_notes: Annotated[list[str], operator.add] = []
+
     num_retry_llm_call_node: int
     is_llm_call_error: bool
     research_iterations: int
+    research_notes: Annotated[dict[str, dict[str, dict]], add_dict]
+    visited_urls: Annotated[list[str], operator.add]
+
+
+class ResearchWriterState(TypedDict):
+    """
+    State for the research writer agent containing research brief, research notes, section writing plan, section texts, and final research text.
+    """
+
+    research_brief: str
+    research_notes: Annotated[dict[str, dict[str, dict]], add_dict]
+    section_texts: Annotated[list[str], operator.add]
+    final_research_text: str
+    report_plan: Annotated[list[dict], operator.add]
+    current_section_index: int

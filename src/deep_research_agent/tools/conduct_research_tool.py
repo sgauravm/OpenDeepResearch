@@ -35,9 +35,11 @@ async def conduct_research(
         agent_reasoning=config.get("agent_reasoning", "low"),
     ).build_agent_graph()
 
+    initial_visited_urls = runtime.state.get("visited_urls", [])
     researcher_state = {
         "researcher_messages": [HumanMessage(content=research_topic)],
         "research_topic": research_topic,
+        "visited_urls": initial_visited_urls,
     }
 
     research_iterations = runtime.state.get("research_iterations", 0)
@@ -48,13 +50,14 @@ async def conduct_research(
         tool_message = result.get(
             "compressed_research", "Error synthesizing research report"
         )
-        raw_notes = result.get("raw_notes", [])
+        research_notes = result.get("research_notes", {})
+        visited_urls = result.get("visited_urls", [])
 
     except Exception as e:
         tool_message = (
             f"The following error occured while conducting research: {str(e)}"
         )
-        raw_notes = []
+        research_notes = {}
 
     return Command(
         update={
@@ -65,7 +68,8 @@ async def conduct_research(
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
-            "raw_notes": raw_notes,
+            "research_notes": research_notes,
+            "visited_urls": visited_urls,
             "research_iterations": research_iterations + 1,
         }
     )

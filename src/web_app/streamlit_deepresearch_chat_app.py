@@ -56,15 +56,15 @@ class StreamlitUI:
             )
 
             self.max_web_search_calls = st.number_input(
-                "Max Web Search Calls", min_value=1, max_value=5, value=3, step=1
+                "Max Web Search Calls", min_value=1, max_value=5, value=5, step=1
             )
 
             self.max_web_search_results = st.number_input(
-                "Max Web Search Results", min_value=1, max_value=3, value=1, step=1
+                "Max Web Search Results", min_value=1, max_value=3, value=3, step=1
             )
 
             self.max_researcher_iterations = st.number_input(
-                "Max Researcher Iterations", min_value=1, max_value=5, value=3, step=1
+                "Max Researcher Iterations", min_value=1, max_value=4, value=3, step=1
             )
             reasoning_options = {
                 "Low": "low",
@@ -168,7 +168,6 @@ class StreamlitUI:
         if self.reason_placeholder:
             html = self._get_html_text(self.reason_accum)
             self.reason_placeholder.markdown(html, unsafe_allow_html=True)
-
 
 
 def main():

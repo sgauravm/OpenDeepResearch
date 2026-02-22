@@ -1,3 +1,4 @@
+from src.deep_research_agent.agents.research_report_writer_agent import ResearchWriterAgent
 from src.deep_research_agent.agents.supervisor_agent import SupervisorResearchAgent
 from src.utils.models import get_model
 from src.utils.helpers import get_today_str, get_prompt_template
@@ -50,7 +51,6 @@ class DeepResearchAgent:
         interleaved_thinking: bool = True,
     ):
         self.model = get_model(reasoning="medium")
-        self.writer_model = get_model(reasoning="low")
         self.supervisor_reasoning = agent_reasoning
         self.interleaved_thinking = interleaved_thinking
 
@@ -67,12 +67,10 @@ class DeepResearchAgent:
             )
         )
 
-        self.write_final_report_template = get_prompt_template(
-            os.path.join(
-                ROOT_DIR,
-                "src/deep_research_agent/prompts/final_report_generation_prompt.jinja",
-            )
-        )
+        self.research_writer_agent = ResearchWriterAgent(
+            planner_reasoning="medium",
+            writer_reasoning="low",
+        ).build_agent_graph()
 
     async def clarify_with_user(
         self,
@@ -149,42 +147,41 @@ class DeepResearchAgent:
             "supervisor_messages": [
                 HumanMessage(content=state.get("research_brief", ""))
             ],
+            "research_notes": state.get("research_notes", {}),
+            "visited_urls": state.get("visited_urls", []),
         }
         result = await research_supervisor.ainvoke(supervisor_state)
         return {
-            "notes": result.get("notes", []),
-            "raw_notes": result.get("raw_notes", []),
+            "research_notes": result.get("research_notes", {}),
+            "visited_urls": result.get("visited_urls", []),
         }
 
     async def final_report_generation(self, state: AgentState):
         """
         Final report generation node.
 
-        Synthesizes all research findings into a comprehensive final report
+        Uses ResearchWriterAgent to synthesize all research findings into a
+        comprehensive final report via planner, section writer, and final doc pipeline.
         """
+        research_notes = state.get("research_notes", {})
+        research_brief = state.get("research_brief", "")
 
-        notes = state.get("notes", [])
-        if len(notes) == 0:
+        if len(research_notes) == 0:
             return {
                 "final_report": "The report could not be generated.",
                 "messages": ["The report could not be generated."],
             }
 
-        findings = "\n".join(notes)
-
-        final_report_prompt = self.write_final_report_template.render(
-            research_brief=state.get("research_brief", ""),
-            findings=findings,
-            date=get_today_str(),
-        )
-
-        final_report = await self.writer_model.ainvoke(
-            [HumanMessage(content=final_report_prompt)]
-        )
+        writer_state = {
+            "research_brief": research_brief,
+            "research_notes": research_notes,
+        }
+        result = await self.research_writer_agent.ainvoke(writer_state)
+        final_research_text = result.get("final_research_text", "The report could not be generated.")
 
         return {
-            "final_report": final_report.content,
-            "messages": ["Here is the final report: " + final_report.content],
+            "final_report": final_research_text,
+            "messages": ["Here is the final report: " + final_research_text],
         }
 
     def build_agent_graph(self):

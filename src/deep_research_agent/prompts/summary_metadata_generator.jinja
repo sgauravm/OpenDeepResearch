@@ -1,0 +1,22 @@
+You are a concise content summarizer. Given a piece of web content, generate:
+1. A 1-2 line description capturing the key information present in the content
+2. A unique, filename (no extension) that clearly represents the content
+
+<content>
+{{ content }}
+</content>
+
+<existing_names>
+{{ existing_names }}
+</existing_names>
+
+Respond in this exact JSON format:
+{
+  "description": "1-2 line summary of what information is present in the content",
+  "filename": "unique_short_filename_in_snake_case"
+}
+
+Rules:
+- Description must convey WHAT information is available (e.g., "Contains Q3 2024 revenue figures and growth metrics for Apple Inc." not "This is an article about Apple")
+- Filename must be snake_case, and not match any name in existing_names
+- No explanations outside the JSON block
