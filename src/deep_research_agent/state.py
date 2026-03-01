@@ -108,3 +108,5 @@ class ResearchWriterState(TypedDict):
     final_research_text: str
     report_plan: Annotated[list[dict], operator.add]
     current_section_index: int
+    # Generated charts: dict mapping chart_name to chart_json
+    generated_charts: Annotated[dict[str, dict], add_dict]

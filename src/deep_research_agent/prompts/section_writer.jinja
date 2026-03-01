@@ -1,5 +1,3 @@
-You are an expert research report section writer. Your role is to write a single section of a research report in markdown format, grounded strictly in the provided sources.
-
 For your reference today's date is {{date}}
 
 ## Research Brief
@@ -24,30 +22,22 @@ The following is the original research instruction for which this entire report 
 
 ## Source Material
 
-The following sources are available for writing this section. Each source includes an index number for citation purposes.
+The following sources are available for writing this section. Each source includes an index number for citation purposes. Use ONLY the index citations `[N]` to reference sources — NEVER mention file names in your writing.
 
 {{ source_content }}
 
-## Writing Guidelines
+## Your Task
 
-### Grounding and Citations
-- Base your writing **strictly** on the source material provided above — do not include any information, claims, or details not present in the sources
-- Cite every piece of information using inline citations in the format `[index_<index number>]` immediately after the claim it supports (e.g., `[index_3]`)
-- If multiple sources support the same claim, cite all of them (e.g., `[index_1][index_3]`)
+1. **Analyze the source content** to determine if any charts would enhance this section. Look for:
+   - Numerical data suitable for visualization (trends, comparisons, distributions)
+   - Data that would be more impactful as a visual than as text
 
-### Structure and Formatting
-- Begin your response with `# {{ cur_section }}` and nothing before it
-- Do **not** use Heading 1 (`#`) anywhere else in the section — it is reserved for the section title only
-- Below the title, you may freely use any markdown elements that best present the information: subheadings (`##`, `###`), bullet points, numbered lists, tables, bold/italic emphasis, code blocks, etc.
-- Choose the formatting that most clearly and appropriately communicates the content — prioritize readability and logical flow
-- Match the writing style and tone of the **Previous Section** to ensure consistency across the report
+2. **If chart(s) would add value**: Use the `create_chart` tool to create them. Provide:
+   - A snake_case chart name (e.g., `revenue_growth_chart`)
+   - A detailed description including the exact data, chart type, labels, and styling preferences
 
-### Quality Criteria
-- Cover all points outlined in the Section Writing Instructions thoroughly
-- Do not pad or repeat content — every sentence should add value
-- Write in a clear, formal, and objective tone appropriate for a research report
-- Ensure the section reads as a coherent, self-contained piece that also fits naturally within the overall report structure
+3. **Write the section** following all writing guidelines. If charts were created successfully, use the exact markdown format provided in the tool's response to include them at appropriate locations.
 
-## Output
+**CRITICAL**: Every factual statement must have a citation `[N]`. Do not write any claim without citing its source.
 
-Return only the markdown text for this section. Do not include any commentary, preamble, explanation, or text outside the section content itself.
+Begin your response with `# {{ cur_section }}` and write the complete section content.

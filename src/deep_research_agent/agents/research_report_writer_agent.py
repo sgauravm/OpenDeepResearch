@@ -2,7 +2,7 @@
 
 This module implements a research report writer with a three-stage pipeline:
 1. Planner node: Creates a structured report plan from research findings
-2. Section writer node: Writes each section based on the plan (iteratively)
+2. Section writer node: Uses the section writer agent to write each section
 3. Final doc node: Concatenates all sections and appends source references
 """
 
@@ -16,6 +16,7 @@ from src.config import ROOT_DIR
 from src.utils.helpers import get_prompt_template, get_today_str
 from src.utils.models import get_model
 from src.deep_research_agent.state import ResearchWriterState
+from src.deep_research_agent.agents.section_writer_agent import SectionWriterAgent
 
 
 SectionMode = Literal["writing_instruction", "actual_content"]
@@ -86,13 +87,12 @@ class ResearchWriterAgent:
         # Base model without structured output; schema is bound dynamically in planner_node
         # from research_notes keys so source_file_name_list uses Literal[valid_filenames]
         self.planner_model = get_model(reasoning=planner_reasoning)
-        self.writer_model = get_model(reasoning=writer_reasoning)
+
+        # Section writer agent for writing sections with chart capability
+        self.section_writer_agent = SectionWriterAgent(reasoning=writer_reasoning)
 
         self.report_writing_planner_template = get_prompt_template(
             ROOT_DIR / "src/deep_research_agent/prompts/report_writing_planner.jinja"
-        )
-        self.section_writer_template = get_prompt_template(
-            ROOT_DIR / "src/deep_research_agent/prompts/section_writer.jinja"
         )
 
     # ===== Node Implementations =====
@@ -154,11 +154,11 @@ class ResearchWriterAgent:
                 if isinstance(note, dict):
                     content = note.get("content", "")
                     global_idx = filename_to_global_idx.get(filename, 0)
-                    parts.append(f"SOURCE [index_{global_idx}]:\n{content}\n---\n\n")
+                    parts.append(f"SOURCE [{global_idx}]:\n{content}\n---\n\n")
         return "".join(parts)
 
     def section_writer_node(self, state: ResearchWriterState) -> dict:
-        """Write a single section based on the report plan."""
+        """Write a single section based on the report plan using the section writer agent."""
         report_plan = state.get("report_plan", [])
         current_index = state.get("current_section_index", 0)
         section_texts = state.get("section_texts", [])
@@ -185,7 +185,7 @@ class ResearchWriterAgent:
                 "current_section_index": current_index + 1,
             }
 
-        # writing_instruction mode: call LLM
+        # writing_instruction mode: use section writer agent
         section_names = "\n".join(
             [f"{i + 1}. {s['section_name']}" for i, s in enumerate(report_plan)]
         )
@@ -201,7 +201,8 @@ class ResearchWriterAgent:
 
         source_text = self._build_source_content(source_file_names, research_notes)
 
-        prompt = self.section_writer_template.render(
+        # Use the section writer agent to write the section
+        content = self.section_writer_agent.write_section(
             research_brief=research_brief,
             section_names=section_names,
             cur_section=cur_section_name,
@@ -209,11 +210,6 @@ class ResearchWriterAgent:
             previous_section=prev_section_text,
             source_content=source_text,
         )
-
-        response = self.writer_model.invoke([SystemMessage(content=prompt)])
-        content = response.content if hasattr(response, "content") else str(response)
-        if content and not content.strip().startswith("#"):
-            content = f"# {cur_section_name}\n\n{content}"
 
         return {
             "section_texts": [content],

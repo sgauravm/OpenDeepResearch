@@ -29,6 +29,7 @@ Produce a section-by-section report plan where:
 - Create only essential H1 sections — do not over-granularize or artificially inflate
 - Combine closely related findings into single coherent sections
 - Omit generic sections ("Background," "Methodology," "Limitations," "Literature Review") unless explicitly supported by Research Findings
+- **NEVER create a "References", "Sources", "Bibliography", "Citations", or "Works Cited" section** — the references section is automatically generated and appended to the report separately
 - Section count must match the scope of the brief — neither sparse nor bloated
 - Subsections (H2/H3), tables, and analytical breakdowns are described inside `writing_instruction` only
 - Do NOT create meta-sections about the report itself (e.g., "Overview of Data Sources," "Data Summary," "How This Report Was Built"). Every section must deliver substantive findings that directly answer the Research Brief — not describe the sources used to build it
@@ -50,7 +51,8 @@ Every section must declare exactly one `"section_mode"`: either `"writing_instru
 ### actual_content mode
 - Write complete, publication-ready text in professional research tone
 - No meta-phrases ("This section synthesizes…", "The following report…")
-- Cite file indices in square brackets where helpful (e.g., [2], [5])
+- NEVER mention source file names in the content — sources are cited only using format `[N]` (e.g., `[1]`, `[2]`) and listed at the end of the report
+- Do NOT write sentences like "The primary sources are file_a, file_b..." or "Based on file_x..."
 - `"writing_instruction"` must be `""`
 - `"source_file_name_list"` must be `[]`
 
@@ -64,6 +66,7 @@ Mixing modes is strictly prohibited.
 - End with a Conclusion or Conclusion + Recommendations (`actual_content`)
 - All middle sections use `writing_instruction`
 - Order: foundational context → core analysis → comparison → implications → closing synthesis
+- **DO NOT create a "References", "Sources", "Bibliography", or "Works Cited" section** — the references section is automatically generated and appended to the report. Your plan should NOT include any such section.
 
 ---
 

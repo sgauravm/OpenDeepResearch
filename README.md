@@ -1,134 +1,230 @@
 # OpenDeepResearch
 
-OpenDeepResearch is a powerful deep research agent designed to perform autonomous, multi-step research on complex topics. It leverages open-source Large Language Models (LLMs) via Ollama and integrates web search capabilities to gather, synthesize, and report information.
-
-This project is built using:
-- **LangGraph** for agentic workflow orchestration (Researcher, Supervisor, Writer agents).
-- **Ollama** for local LLM inference.
-- **Ollama Web Search** for real-time information gathering.
-- **Streamlit** for an interactive chat interface.
+OpenDeepResearch is a powerful autonomous research agent that performs multi-step deep research on complex topics. It leverages local Large Language Models via Ollama, conducts web searches to gather real-time information, and generates comprehensive research reports with visualizations.
 
 ## Features
 
-- **Deep Research**: autonomously plans and executes multi-step research iterations.
-- **Local Privacy**: Runs entirely with local models using Ollama (except for web search queries).
-- **Agentic Workflow**: A supervisor agent coordinates multiple research agents to cover different aspects of a query.
-- **Web Search Integration**: Uses the `ollama` Python library's web search to fetch live data.
+- **Autonomous Deep Research**: Plans and executes multi-step research with clarifying questions
+- **Multi-Agent Architecture**: Supervisor coordinates multiple researcher agents for comprehensive coverage
+- **Web Search Integration**: Real-time information gathering using Ollama's web search
+- **Research Note-Taking**: Structured note collection and synthesis across research iterations
+- **Chart Generation**: Automatic Plotly chart creation for data visualization
+- **Report Generation**: Professional reports in Markdown and PDF formats
+- **Local Privacy**: Runs entirely with local models (except web search queries)
+- **Dual Interface**: Streamlit web app and command-line interface
 
 ![Deep Research Agent UI](assets/app_screenshot.png)
 
+## Architecture
+
+The agent uses a hierarchical multi-agent system built with LangGraph:
+
+```
+DeepResearchAgent (Main Orchestrator)
+├── Clarification Phase → Asks user clarifying questions
+├── Research Brief → Generates structured research plan
+├── SupervisorAgent → Coordinates research
+│   └── ResearcherAgents (concurrent) → Conduct web searches, take notes
+└── ResearchWriterAgent → Generates final report
+    ├── Report Planner → Plans report structure
+    ├── SectionWriterAgents → Write sections with charts
+    │   └── ChartAgent → Creates Plotly visualizations
+    └── Final Document Assembly
+```
+
+![Agent Architecture](assets/overall_agent.png)
+
 ## Hardware Requirements
 
-This project relies on running large language models locally.
-- **Tested on**: Mac Studio M3 Ultra.(RAM: 96 GB (Unified Memory), CPU Core: 28, GPU Core: 60)
+- **Tested on**: Mac Studio M3 Ultra (96GB RAM, 28 CPU cores, 60 GPU cores)
 - **Minimum Requirements**:
-  - **RAM/VRAM**: Approximately **16GB+** is required to run the default `gpt-oss:20b` (4-bit quantized) model, which is about 14GB in size.
-  - **Storage**: ~15-20GB free space for model weights.
-  - **Recommended**: Apple Silicon (M-series) Mac or a PC with an NVIDIA GPU (16GB+ VRAM).
+  - **RAM/VRAM**: 16GB+ for the default `gpt-oss` model (4-bit quantized, ~14GB)
+  - **Storage**: 15-20GB free space for model weights
+  - **Recommended**: Apple Silicon Mac or NVIDIA GPU with 16GB+ VRAM
 
 ## Prerequisites
 
-- **Python**: >= 3.12
-- **Ollama**: Installed and running [Download Ollama](https://ollama.com).
+- **Python**: >= 3.14
+- **Ollama**: Installed and running ([Download Ollama](https://ollama.com))
 
-## Installation & Setup
+## Installation
 
-### Quick Start (Interactive Setup)
-We provide an interactive script to automate dependency installation, model setup, and configuration.
+### Quick Start
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/sgauravm/OpenDeepResearch.git
-    cd OpenDeepResearch
-    ```
+```bash
+# Clone the repository
+git clone https://github.com/sgauravm/OpenDeepResearch.git
+cd OpenDeepResearch
 
-2.  **Run the Setup Script**
-    ```bash
-    python setup_interactive.py
-    ```
-    Follow the on-screen instructions to:
-    - Install `uv` (if missing).
-    - Install Python dependencies.
-    - Set up Ollama models.
-    - Configure your Ollama web_search API key.
-    - Launch the app.
+# Run the interactive setup script
+python setup_interactive.py
+```
+
+The setup script will:
+- Install `uv` package manager (if missing)
+- Install Python dependencies
+- Set up Ollama models
+- Configure your Ollama API key
+- Launch the app
 
 ### Manual Setup
-If you prefer to set up everything manually or the script doesn't work for you, follow these steps:
 
-1.  **Install `uv`** (Recommended)
-    This project uses `uv` for fast dependency management.
-    ```bash
-    # MacOS/Linux
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-    *Alternatively via pip: `pip install uv`*
+1. **Install `uv`** (recommended package manager)
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-2.  **Install Dependencies**
-    Run `uv sync` to install all dependencies and create the virtual environment automatically.
-    ```bash
-    uv sync
-    ```
-    *Note: If you prefer standard pip, you can use `pip install .`, but `uv` is highly recommended.*
+2. **Install Dependencies**
+   ```bash
+   uv sync
+   ```
 
-## Ollama Setup
+3. **Pull the Required Model**
+   ```bash
+   ollama pull gpt-oss
+   ```
 
-1.  **Pull/Run Required Models**
-    The interactive script will guide you, or you can run these manually in a terminal:
-    ```bash
-    ollama run gpt-oss:20b
-    ```
-    *Note: Leaving `ollama run` will start a chat session; verify the model is pulled and then exit (Ctrl+D).*
+4. **Configure Web Search API Key**
 
-2.  **Configure Web Search**
-    This project uses the `ollama` Python library for web search, which requires an API key.
-    -   Obtain your API key from your Ollama account [settings](https://ollama.com/settings/keys).
-    -   Set the environment variable globally (persistent):
-        
-        **Mac/Linux:**
-        Add it to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`):
-        ```bash
-        echo 'export OLLAMA_API_KEY="your_api_key_here"' >> ~/.zshrc
-        source ~/.zshrc
-        ```
+   Get your API key from [Ollama settings](https://ollama.com/settings/keys) and set it:
+   ```bash
+   # Mac/Linux - add to ~/.zshrc or ~/.bashrc
+   export OLLAMA_API_KEY="your_api_key_here"
 
-        **Windows (Powershell/CMD):**
-        Use `setx` to save it permanently:
-        ```powershell
-        setx OLLAMA_API_KEY "your_api_key_here"
-        ```
-        *Note: You will need to restart your terminal for changes to take effect.*
-    *Ensure your `ollama` python library is version 0.6.0 or higher.*
+   # Windows PowerShell
+   setx OLLAMA_API_KEY "your_api_key_here"
+   ```
 
 ## Usage
 
-### Run the App
-Launch the interactive research assistant using Streamlit.
+### Streamlit Web App
 
-First, activate the virtual environment created by `uv`:
 ```bash
-# MacOS/Linux
-source .venv/bin/activate
+# Activate virtual environment
+source .venv/bin/activate  # Mac/Linux
+# or
+.venv\Scripts\activate     # Windows
 
-# Windows
-.venv\Scripts\activate
-```
-
-Then run the app:
-```bash
+# Run the app
 streamlit run src/web_app/streamlit_deepresearch_chat_app.py
-```
 
-*Alternatively, you can use `uv run` without activating manualy:*
-```bash
+# Or using uv directly
 uv run streamlit run src/web_app/streamlit_deepresearch_chat_app.py
 ```
 
-### Configuration
-- **Settings**: You can modify `src/config.py` to change default models (`gpt-oss`), adjust search limits, or tune agent parameters.
-- **Environment Variables**: Manage sensitive keys (like `OLLAMA_API_KEY`) in your shell or a `.env` file (rename `.env.example` if available).
+### Command Line Interface
+
+```bash
+# Run with default settings
+python -m src.scripts.run_deep_research_agent
+
+# Run with high reasoning level
+python -m src.scripts.run_deep_research_agent --reasoning high
+
+# Run with custom configuration
+python -m src.scripts.run_deep_research_agent \
+  --max-web-search-calls 10 \
+  --max-researcher-iterations 3
+
+# Hide reasoning output
+python -m src.scripts.run_deep_research_agent --no-reasoning
+```
+
+**CLI Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--reasoning` | medium | Reasoning level (low/medium/high) |
+| `--interleaved-thinking` | True | Enable interleaved thinking |
+| `--max-web-search-calls` | 5 | Max web searches per researcher |
+| `--max-web-search-results` | 3 | Max results per search |
+| `--max-researcher-iterations` | 2 | Max research iterations |
+| `--no-reasoning` | False | Hide reasoning output |
+
+## Configuration
+
+Edit `src/config.py` to customize agent behavior:
+
+```python
+MODEL_CONFIG = {
+    "model_name": "gpt-oss",
+    "temperature": 0,
+    "reasoning": "medium",
+}
+
+FINAL_AGENT_CONFIG = {
+    "max_web_search_calls": 5,
+    "max_web_search_results": 3,
+    "max_llm_call_retry": 2,
+    "max_researcher_iterations": 2,
+    "max_concurrent_researchers": 3,
+    "interleaved_thinking": True,
+    "agent_reasoning": "medium",
+}
+```
+
+## Output
+
+Research reports are saved to the `output/` directory:
+- `research_report_YYYYMMDD_HHMMSS.md` - Markdown report
+- `research_report_YYYYMMDD_HHMMSS.pdf` - PDF report
+- `output/charts/` - Generated chart images (PNG, HTML, JSON)
 
 ## Project Structure
-- `src/deep_research_agent`: Core agent logic (Researcher, Supervisor, Tools).
-- `src/web_app`: Streamlit application code.
-- `src/config.py`: Configuration details for models and agents.
+
+```
+OpenDeepResearch/
+├── src/
+│   ├── config.py                    # Configuration settings
+│   ├── types.py                     # Type definitions
+│   ├── deep_research_agent/
+│   │   ├── agents/
+│   │   │   ├── final_deep_research_agent.py   # Main orchestrator
+│   │   │   ├── supervisor_agent.py            # Research coordinator
+│   │   │   ├── research_agent.py              # Web search researcher
+│   │   │   ├── research_report_writer_agent.py # Report generator
+│   │   │   ├── section_writer_agent.py        # Section writer with charts
+│   │   │   └── chart_agent_code_with_tools.py # Chart generator
+│   │   ├── tools/
+│   │   │   ├── search_tool.py          # Web search tool
+│   │   │   ├── create_chart_tool.py    # Chart creation tool
+│   │   │   └── ...
+│   │   ├── prompts/                    # Jinja2 prompt templates
+│   │   └── state.py                    # Agent state definitions
+│   ├── web_app/
+│   │   └── streamlit_deepresearch_chat_app.py  # Streamlit UI
+│   ├── scripts/
+│   │   └── run_deep_research_agent.py  # CLI script
+│   └── utils/
+│       ├── models.py                   # Model utilities
+│       ├── stream.py                   # Streaming utilities
+│       └── helpers.py                  # Helper functions
+├── output/                             # Generated reports and charts
+├── assets/                             # Screenshots and images
+└── pyproject.toml                      # Project dependencies
+```
+
+## How It Works
+
+1. **User Input**: Enter a research query
+2. **Clarification**: Agent asks clarifying questions to understand scope
+3. **Research Brief**: Generates a structured research plan
+4. **Research Phase**: Supervisor dispatches multiple researchers who:
+   - Conduct web searches
+   - Analyze and summarize findings
+   - Take structured notes
+5. **Report Generation**:
+   - Planner creates report outline
+   - Section writers draft each section
+   - Charts are generated for data visualization
+   - Final document is assembled
+6. **Output**: Report saved as Markdown and PDF
+
+## Dependencies
+
+Key dependencies (see `pyproject.toml` for full list):
+- `langgraph` - Agent orchestration
+- `langchain-ollama` - Ollama integration
+- `streamlit` - Web interface
+- `plotly` - Chart generation
+- `weasyprint` - PDF generation
+- `markdown` - Markdown processing

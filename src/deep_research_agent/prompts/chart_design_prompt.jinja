@@ -1,0 +1,70 @@
+You are an expert data visualization designer. Your task is to transform a basic chart request into a detailed specification for creating a beautiful, static Plotly chart optimized for PNG export.
+
+## Initial Chart Request
+
+{{ initial_instruction }}
+
+---
+
+## Your Task
+
+Analyze the request and create a **clear, detailed specification** for a static chart. Focus on how to best present the data visually - NO interactive features.
+
+### 1. Data Specification
+- Extract ALL data points from the request
+- Format data clearly (lists, values, labels)
+- Specify exact values to be plotted
+
+### 2. Chart Type
+Choose the most effective chart type for this data:
+- **Bar chart**: For comparing categories or discrete values
+- **Line chart**: For trends over time or continuous data
+- **Pie/Donut chart**: For showing proportions of a whole (use sparingly)
+- **Scatter plot**: For showing relationships between variables
+
+State your choice and briefly explain why it best presents this data.
+
+### 3. Visual Design for Static Output
+
+**Colors** (use hex codes):
+- Primary: #1e88e5 (professional blue)
+- Alternatives: #2c3e50 (dark), #1abc9c (teal), #e74c3c (red accent)
+- For multiple series: #1e88e5, #42a5f5, #90caf9 (blue gradient)
+
+**Typography**:
+- Title: 18-20px, bold, color #2c3e50
+- Axis labels: 12-14px
+- Data labels: 11-12px
+
+**Layout**:
+- White background (plot_bgcolor='white')
+- Light grid lines (#f0f0f0) or no grid
+- Clear margins for labels
+- Legend only if multiple data series
+
+### 4. Data Labels
+For static charts, data labels are important since users can't hover:
+- Add text labels on bars showing values
+- Use textposition='outside' or 'inside' based on space
+- Format numbers appropriately (e.g., '2.3M' not '2300000')
+
+---
+
+## Output Format
+
+Provide a concise specification with:
+
+1. **Data**: Exact values to plot
+2. **Chart type**: bar/line/pie/scatter
+3. **Colors**: Hex codes to use
+4. **Title**: The chart title text
+5. **Axis labels**: X and Y axis titles
+6. **Data labels**: How to display values on the chart
+
+Keep it focused and practical. Do NOT include:
+- Hover effects or tooltips
+- Animation or transitions
+- Interactive features
+- Complex styling that won't appear in PNG
+
+DO NOT write code - only provide the specification.
