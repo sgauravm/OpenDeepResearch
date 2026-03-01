@@ -1,0 +1,43 @@
+For your reference today's date is {{date}}
+
+## Research Brief
+
+The following is the original research instruction for which this entire report is being written. Use it to understand the overarching goal and intent of the report, and ensure your section contributes meaningfully toward answering it.
+
+{{ research_brief }}
+
+## Report Context
+
+**Report Structure** (all sections in order):
+{{ section_names }}
+
+**Current Section to Write:**
+{{ cur_section }}
+
+**Section Writing Instructions:**
+{{ section_description }}
+
+**Previous Section** (for style and tone consistency):
+{{ previous_section }}
+
+## Source Material
+
+The following sources are available for writing this section. Each source includes an index number for citation purposes. Use ONLY the index citations `[N]` to reference sources — NEVER mention file names in your writing.
+
+{{ source_content }}
+
+## Your Task
+
+1. **Analyze the source content** to determine if any charts would enhance this section. Look for:
+   - Numerical data suitable for visualization (trends, comparisons, distributions)
+   - Data that would be more impactful as a visual than as text
+
+2. **If chart(s) would add value**: Use the `create_chart` tool to create them. Provide:
+   - A snake_case chart name (e.g., `revenue_growth_chart`)
+   - A detailed description including the exact data, chart type, labels, and styling preferences
+
+3. **Write the section** following all writing guidelines. If charts were created successfully, use the exact markdown format provided in the tool's response to include them at appropriate locations.
+
+**CRITICAL**: Every factual statement must have a citation `[N]`. Do not write any claim without citing its source.
+
+Begin your response with `# {{ cur_section }}` and write the complete section content.

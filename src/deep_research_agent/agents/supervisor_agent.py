@@ -9,22 +9,14 @@ The supervisor uses parallel research execution to improve efficiency while
 maintaining isolated context windows for each research topic.
 """
 
-import asyncio
-
 from typing_extensions import Literal
 from langgraph.prebuilt import ToolNode
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
     HumanMessage,
-    BaseMessage,
     SystemMessage,
-    ToolMessage,
-    filter_messages,
 )
 from langgraph.graph import StateGraph, START, END
-from langgraph.types import Command
-
 
 from src.deep_research_agent.state import SupervisorState
 from src.deep_research_agent.tools.conduct_research_tool import conduct_research
@@ -50,33 +42,6 @@ class SupervisorResearchAgent:
         )
         self.model = get_model(reasoning=agent_reasoning)
         self.model_with_tools = self.model.bind_tools(self.tools)
-
-    def _get_notes_from_tool_calls(self, messages: list[BaseMessage]) -> list[str]:
-        """Extract research notes from ToolMessage objects in supervisor message history.
-
-        This function retrieves the compressed research findings that sub-agents
-        return as ToolMessage content. When the supervisor delegates research to
-        sub-agents via ConductResearch tool calls, each sub-agent returns its
-        compressed findings as the content of a ToolMessage. This function
-        extracts all such ToolMessage content to compile the final research notes.
-
-        Args:
-            messages: List of messages from supervisor's conversation history
-
-        Returns:
-            List of research note strings extracted from ToolMessage objects
-        """
-        return [
-            tool_msg.content
-            for tool_msg in filter_messages(messages, include_types="tool")
-            if tool_msg.name == "conduct_research"
-        ]
-
-    async def collect_notes(self, state: SupervisorState):
-        """Use this tool to indicate that research is finished."""
-        supervisor_messages = state.get("supervisor_messages", [])
-        notes = self._get_notes_from_tool_calls(supervisor_messages)
-        return {"notes": notes}
 
     async def llm_call(self, state: SupervisorState, config: RunnableConfig) -> dict:
         """Analyze state and decide next actions."""
@@ -113,32 +78,31 @@ class SupervisorResearchAgent:
 
     async def should_continue(
         self, state: SupervisorState, config: RunnableConfig
-    ) -> Literal["tool_node", "collect_notes", "llm_call"]:
-        """Decide whether to continue research or compress results."""
+    ) -> Literal["tool_node", "__end__", "llm_call"]:
+        """Decide whether to continue research or end."""
         last_message = state["supervisor_messages"][-1]
 
         if state.get("is_llm_call_error", False):
             if state["num_retry_llm_call_node"] > config.get("configurable", {}).get(
                 "max_llm_call_retry"
             ):
-                return "collect_notes"
+                return "__end__"
             else:
                 return "llm_call"
 
         if last_message.tool_calls:
             for tool_call in last_message.tool_calls:
                 if tool_call.get("name", "") == "research_complete":
-                    return "collect_notes"
+                    return "__end__"
             return "tool_node"
 
-        return "collect_notes"
+        return "__end__"
 
     def build_agent_graph(self) -> StateGraph:
         """Constructs and returns the research agent workflow graph."""
         agent_builder = StateGraph(SupervisorState)
         agent_builder.add_node("llm_call", self.llm_call)
         agent_builder.add_node("tool_node", self.tool_node)
-        agent_builder.add_node("collect_notes", self.collect_notes)
 
         agent_builder.add_edge(START, "llm_call")
         agent_builder.add_conditional_edges(
@@ -146,11 +110,10 @@ class SupervisorResearchAgent:
             self.should_continue,
             {
                 "tool_node": "tool_node",
-                "collect_notes": "collect_notes",
+                "__end__": END,
                 "llm_call": "llm_call",
             },
         )
         agent_builder.add_edge("tool_node", "llm_call")
-        agent_builder.add_edge("collect_notes", END)
 
         return agent_builder.compile()

@@ -1,24 +1,70 @@
-import streamlit as st
+import base64
+import re
 import uuid
-import dotenv
+from pathlib import Path
 from typing import Dict
+
+import dotenv
+import streamlit as st
 from langchain_core.messages import HumanMessage
 
 try:
-    from src.utils.stream import run_async_generator, StreamEventProcessor
-    from src.config import FINAL_AGENT_CONFIG
+    from src.config import FINAL_AGENT_CONFIG, ROOT_DIR
     from src.deep_research_agent.agents.final_deep_research_agent import (
         DeepResearchAgent,
     )
     from src.types import ContentType, ToolName
+    from src.utils.stream import StreamEventProcessor, run_async_generator
 except ImportError as e:
     st.error(
         f"Error importing local modules: {e}. Please ensure 'src' directory structure is correct."
     )
     st.stop()
 
+# Charts directory
+CHARTS_DIR = ROOT_DIR / "output" / "charts"
+
 
 dotenv.load_dotenv()
+
+
+def render_markdown_with_charts(content: str):
+    """
+    Render markdown content with embedded chart images.
+
+    Splits content at chart image references and renders them using st.image()
+    since st.markdown() doesn't support local file paths.
+    """
+    # Pattern to match markdown images: ![alt](charts/filename.png)
+    pattern = r"!\[([^\]]*)\]\((charts/[^)]+\.png)\)"
+
+    # Split content by image references
+    parts = re.split(pattern, content)
+
+    # parts will be: [text, alt1, path1, text, alt2, path2, ...]
+    i = 0
+    while i < len(parts):
+        if i + 2 < len(parts) and parts[i + 2].startswith("charts/"):
+            # Render text before image
+            if parts[i].strip():
+                st.markdown(parts[i])
+
+            # Render image
+            alt_text = parts[i + 1]
+            rel_path = parts[i + 2]
+            img_path = ROOT_DIR / "output" / rel_path
+
+            if img_path.exists():
+                st.image(str(img_path), caption=alt_text)
+            else:
+                st.warning(f"Chart image not found: {rel_path}")
+
+            i += 3
+        else:
+            # Regular text
+            if parts[i].strip():
+                st.markdown(parts[i])
+            i += 1
 
 
 class StreamlitUI:
@@ -56,15 +102,15 @@ class StreamlitUI:
             )
 
             self.max_web_search_calls = st.number_input(
-                "Max Web Search Calls", min_value=1, max_value=5, value=3, step=1
+                "Max Web Search Calls", min_value=1, max_value=5, value=5, step=1
             )
 
             self.max_web_search_results = st.number_input(
-                "Max Web Search Results", min_value=1, max_value=3, value=1, step=1
+                "Max Web Search Results", min_value=1, max_value=3, value=3, step=1
             )
 
             self.max_researcher_iterations = st.number_input(
-                "Max Researcher Iterations", min_value=1, max_value=5, value=3, step=1
+                "Max Researcher Iterations", min_value=1, max_value=4, value=3, step=1
             )
             reasoning_options = {
                 "Low": "low",
@@ -80,7 +126,11 @@ class StreamlitUI:
     def render_chat_history(self):
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                if message["role"] == "assistant":
+                    # Use custom renderer for assistant messages to handle charts
+                    render_markdown_with_charts(message["content"])
+                else:
+                    st.markdown(message["content"])
 
     def _ensure_status_container(self):
         if self.current_chat_container is None:
@@ -101,7 +151,8 @@ class StreamlitUI:
                 )
 
             with st.chat_message("assistant"):
-                st.markdown(payload["content"])
+                # Use custom renderer to handle chart images
+                render_markdown_with_charts(payload["content"])
 
             st.session_state.messages.append(
                 {"role": "assistant", "content": payload["content"]}
@@ -168,7 +219,6 @@ class StreamlitUI:
         if self.reason_placeholder:
             html = self._get_html_text(self.reason_accum)
             self.reason_placeholder.markdown(html, unsafe_allow_html=True)
-
 
 
 def main():

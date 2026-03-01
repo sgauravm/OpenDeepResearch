@@ -96,6 +96,7 @@ docker-compose.override.yml
 *.pid
 
 # ---- Notebooks / Experiments ----
+output/
 outputs/
 logs/
 checkpoints/

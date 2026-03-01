@@ -19,12 +19,18 @@ async def graph_stream_print(
     subgraphs=True,
 ):
     result = None
-    async for subgraph, mode, chunk in agent.astream(
+    async for stream_item in agent.astream(
         input=state,
         stream_mode=["messages", "custom", "values"],
         config=config,
         subgraphs=subgraphs,
     ):
+        # Unpack: (mode, chunk) for flat graphs, (subgraph, mode, chunk) for subgraphs
+        if len(stream_item) == 3:
+            _subgraph, mode, chunk = stream_item
+        else:
+            mode, chunk = stream_item
+
         # Print custom values
         if mode == "custom":
             msg = chunk.get("message", None)
@@ -34,7 +40,9 @@ async def graph_stream_print(
         # Print llm messages from selected nodes
         if mode == "messages":
             if (
-                chunk[1]["langgraph_node"] in ["compress_research"]
+                isinstance(chunk, (list, tuple))
+                and len(chunk) >= 2
+                and chunk[1].get("langgraph_node") in ["compress_research", "llm_call"]
                 and chunk[0].content != ""
             ):
                 print(chunk[0].content, end="", flush=True)
