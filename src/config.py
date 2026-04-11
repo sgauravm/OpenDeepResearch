@@ -4,7 +4,8 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = ROOT_DIR / "src" / "deep_research_agent" / "prompts"
 MODEL_CONFIG = {
-    "model_name": "gpt-oss",
+    # "model_name": "gpt-oss",
+    "model_name": "gemma4:e2b",
     "temperature": 0,
     "reasoning": "medium",
 }
