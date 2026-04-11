@@ -116,3 +116,4 @@ mlruns/
 *.swo
 .claude
 CLAUDE.md
+notebooks/
