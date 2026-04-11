@@ -79,7 +79,7 @@ class DeepResearchAgent:
 
         self.research_writer_agent = ResearchWriterAgent(
             planner_reasoning="medium",
-            writer_reasoning="low",
+            writer_reasoning="medium",
         ).build_agent_graph()
 
     async def clarify_with_user(

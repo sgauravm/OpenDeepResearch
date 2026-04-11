@@ -23,6 +23,8 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 from langchain.tools import ToolRuntime, tool
 
+from src.config import CHART_AGENT_CONFIG
+
 
 @dataclass
 class ExecutionResult:
@@ -131,22 +133,25 @@ main()
 """
 
 
-def _truncate_error_message(msg: str, max_lines: int = 2) -> str:
-    """Truncate error message to at most max_lines for LLM consumption.
+def _truncate_error_message(msg: str, max_lines: int | None = None) -> str:
+    """Truncate an error message for LLM consumption.
 
-    Prefers: (1) the exception message, (2) the last traceback frame (File/line).
+    Keeps the exception header and the tail of the traceback — which is
+    where the user code's failing line normally lives — so the model has
+    enough context to actually fix its own bug on retry.
     """
-    lines = [ln.strip() for ln in msg.splitlines() if ln.strip()]
+    if max_lines is None:
+        max_lines = CHART_AGENT_CONFIG.get("code_mode_error_context_lines", 8)
+
+    lines = [ln.rstrip() for ln in msg.splitlines() if ln.strip()]
     if len(lines) <= max_lines:
-        return msg
-    # First line is usually the exception
-    result = [lines[0]]
-    # Add the last "File ... line N" line if present (user code location)
-    for ln in reversed(lines[1:]):
-        if "File" in ln and "line" in ln:
-            result.append(ln)
-            break
-    return "\n".join(result[:max_lines])
+        return "\n".join(lines)
+
+    # Always keep the first line (exception header) and the last
+    # max_lines-1 lines of the traceback (where the user code failure is).
+    head = lines[:1]
+    tail = lines[-(max_lines - 1):]
+    return "\n".join(head + tail)
 
 
 def execute_plotly_code(
@@ -155,7 +160,7 @@ def execute_plotly_code(
     timeout_seconds: float = 30.0,
     return_html: bool = True,
     data_csv: str | None = None,
-    max_error_lines: int = 2,
+    max_error_lines: int | None = None,
 ) -> ExecutionResult:
     """
     Execute Python code that generates a Plotly chart in a safe subprocess.

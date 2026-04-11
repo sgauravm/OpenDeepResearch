@@ -110,3 +110,41 @@ class ResearchWriterState(TypedDict):
     current_section_index: int
     # Generated charts: dict mapping chart_name to chart_json
     generated_charts: Annotated[dict[str, dict], add_dict]
+
+
+class SectionWriterState(TypedDict):
+    """
+    State for the section writer subgraph (plan → charts → writer).
+
+    All fields are caller-supplied context or are written by exactly one
+    internal node, so none require a reducer — the default "replace on
+    write, persist on no-write" behavior that LangGraph gives a declared
+    TypedDict field is exactly what we need.
+    """
+
+    # Caller-supplied context (populated by write_section on graph entry)
+    research_brief: str
+    section_names: str
+    cur_section: str
+    section_description: str
+    previous_section: str
+    source_content: str
+
+    # Internal channels written by the graph's nodes
+    chart_plan: list[dict]  # written by the plan node
+    successful_charts: list[dict]  # written by the charts node
+    section_content: str  # written by the writer node
+    is_complete: bool  # written by the writer node
+
+
+class SectionWriterOutputState(TypedDict):
+    """
+    Output surface of the section writer subgraph.
+
+    Exposes only what the caller (`ResearchWriterAgent.section_writer_node`)
+    actually consumes, mirroring the ResearcherOutputState pattern so
+    internal scratch fields don't leak into the parent graph's state.
+    """
+
+    section_content: str
+    is_complete: bool

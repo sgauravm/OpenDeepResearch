@@ -114,3 +114,6 @@ mlruns/
 *.tmp
 *.swp
 *.swo
+.claude
+CLAUDE.md
+notebooks/
