@@ -170,6 +170,12 @@ class StreamEventProcessor:
         elif name == ToolName.WEB_SEARCH:
             content = f"Conducting web search on topic: {args.get('query')}"
         elif name == ToolName.COMPLETE:
+            # Researchers also call `research_complete` to signal they are done
+            # collecting info (which then triggers compress_research). Only the
+            # supervisor's research_complete means the pipeline is actually
+            # moving on to final report generation.
+            if agent_type != AgentType.SUPERVISOR:
+                return None
             content = "Generating final report"
         else:
             return None
