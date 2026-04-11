@@ -96,6 +96,7 @@ class StreamlitUI:
                 st.session_state.messages = []
                 st.session_state.thread = None
                 st.rerun()
+
             self.show_reasoning = st.toggle("Show reasoning", value=True)
             self.interleaved_thinking = st.toggle(
                 "Enable interleaved thinking", value=True

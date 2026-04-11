@@ -26,18 +26,18 @@ The following sources are available for writing this section. Each source includ
 
 {{ source_content }}
 
+{% if successful_charts %}
+## Available Charts
+
+The following chart(s) have already been generated for this section. You MUST embed each one at a natural location in the narrative using the exact markdown snippet shown in the `Embed:` line. Use the `Shows:` line only as context for placement and for writing a brief introductory sentence — do NOT cite the `Shows:` line as a source, and do NOT restate the chart's contents verbatim as prose immediately adjacent to it.
+
+{% for chart in successful_charts %}
+- **{{ chart.chart_name }}**
+  - Shows: {{ chart.chart_purpose }}
+  - Embed: `{{ chart.image_markdown }}`
+{% endfor %}
+{% endif %}
+
 ## Your Task
 
-1. **Analyze the source content** to determine if any charts would enhance this section. Look for:
-   - Numerical data suitable for visualization (trends, comparisons, distributions)
-   - Data that would be more impactful as a visual than as text
-
-2. **If chart(s) would add value**: Use the `create_chart` tool to create them. Provide:
-   - A snake_case chart name (e.g., `revenue_growth_chart`)
-   - A detailed description including the exact data, chart type, labels, and styling preferences
-
-3. **Write the section** following all writing guidelines. If charts were created successfully, use the exact markdown format provided in the tool's response to include them at appropriate locations.
-
-**CRITICAL**: Every factual statement must have a citation `[N]`. Do not write any claim without citing its source.
-
-Begin your response with `# {{ cur_section }}` and write the complete section content.
+Write the complete section following all writing guidelines. Every factual statement must have a citation `[N]`. Begin your response with `# {{ cur_section }}` and write the complete section content — nothing before, nothing after.

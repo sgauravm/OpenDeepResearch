@@ -1,46 +1,119 @@
-"""Section Writer Agent Implementation.
+"""Section Writer Agent.
 
-This agent writes a single section of a research report with chart creation capability.
-It analyzes source content, creates charts when appropriate, and produces
-well-structured markdown content with proper citations.
+Writes a single section of a research report. Chart creation is handled as
+an explicit preparatory step — not as a tool call made by the writer model —
+which keeps the pipeline deterministic across different model families.
+
+Flow
+----
+    plan  →  (charts if any)  →  writer  →  END
+
+- `plan`    Uses structured output (`SectionChartPlan`) to decide whether any
+            charts are needed. Empty list is the default. When charts are
+            planned, each chart gets a snake_case name, a data-complete
+            description for the chart generator, and a one-sentence
+            `chart_purpose` used later for narrative placement.
+- `charts`  (conditional) Iterates the plan, runs the chart generator for
+            each spec, and records only the successful charts. Failed or
+            data-less charts are dropped silently — the writer never hears
+            about them.
+- `writer`  Single LLM call with NO tools bound. Given the source content,
+            the section instructions, and (if any) the successful charts,
+            it produces the final markdown section. Its response IS the
+            section content; there is no extraction heuristic.
 """
 
-from typing import Literal, Annotated, Sequence
+from __future__ import annotations
 
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage, AIMessage
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel
+from typing import Any, Literal
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, Field
 
 from src.config import ROOT_DIR
+from src.deep_research_agent.chart_generator import generate_chart
+from src.deep_research_agent.chart_renderer import ChartParams
+from src.deep_research_agent.state import (
+    SectionWriterOutputState,
+    SectionWriterState,
+)
 from src.utils.helpers import get_prompt_template, get_today_str
 from src.utils.models import get_model
-from src.deep_research_agent.tools.create_chart_tool import create_chart
 
 
-class SectionWriterState(BaseModel):
-    """Internal state for the section writer agent."""
+# ---------------------------------------------------------------------------
+# Structured output schema for the planner node
+# ---------------------------------------------------------------------------
 
-    messages: Annotated[Sequence[BaseMessage], add_messages] = []
-    section_content: str = ""
-    is_complete: bool = False
+
+class ChartSpec(BaseModel):
+    """Specification for a single chart to be generated for the section.
+
+    Note: `chart_params` is a complete, typed chart specification (see
+    ChartParams). Filling it directly here is more reliable than asking the
+    model for a free-form description, and it lets the downstream
+    dispatcher run either the structured renderer or the legacy code agent
+    without needing a separate extractor step.
+    """
+
+    chart_name: str = Field(
+        description=(
+            "A short snake_case identifier for the chart (e.g. "
+            "'finance_efficiency_gains'). No spaces, no capital letters, "
+            "no special characters."
+        )
+    )
+    chart_params: ChartParams = Field(
+        description=(
+            "Complete chart specification: chart type, title, axis labels, "
+            "categories, series (with exact numerical values from the "
+            "sources), value format, and any optional tweaks. Fill every "
+            "field relevant to the chart; leave optional fields empty when "
+            "not needed."
+        )
+    )
+    chart_purpose: str = Field(
+        description=(
+            "One plain-prose sentence describing what the chart "
+            "communicates to the reader. No numbers, no styling — just "
+            "intent. Used by the writer to place the chart naturally in "
+            "the narrative."
+        )
+    )
+
+
+class SectionChartPlan(BaseModel):
+    """Plan output from the chart planner node."""
+
+    charts: list[ChartSpec] = Field(
+        default_factory=list,
+        description=(
+            "Charts to create for this section. Return an empty list when "
+            "no chart is needed — this is the common case. Only populate "
+            "when the source content contains concrete numerical data that "
+            "a visual would communicate materially better than prose."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent
+# ---------------------------------------------------------------------------
 
 
 class SectionWriterAgent:
-    """Agent for writing report sections with chart creation capability."""
+    """Agent for writing report sections with optional chart creation."""
 
     def __init__(
         self,
-        reasoning: Literal["low", "medium", "high"] = "low",
+        reasoning: Literal["low", "medium", "high"] = "medium",
     ):
         self.model = get_model(reasoning=reasoning)
 
-        # Tools for section writer agent
-        self.tools = [create_chart]
-        self.model_with_tools = self.model.bind_tools(self.tools)
-        self.tool_node = ToolNode(tools=self.tools, name="section_writer_tools")
-
+        self.planner_template = get_prompt_template(
+            ROOT_DIR / "src/deep_research_agent/prompts/section_chart_planner.jinja"
+        )
         self.system_template = get_prompt_template(
             ROOT_DIR / "src/deep_research_agent/prompts/section_writer_system.jinja"
         )
@@ -48,70 +121,166 @@ class SectionWriterAgent:
             ROOT_DIR / "src/deep_research_agent/prompts/section_writer.jinja"
         )
 
-    def _llm_call(self, state: dict) -> dict:
-        """Call the LLM with tools."""
-        messages = state.get("messages", [])
-        response = self.model_with_tools.invoke(messages)
-        return {"messages": [response]}
+        self._graph = self._build_graph()
 
-    def _should_continue(self, state: dict) -> Literal["tools", "extract_content"]:
-        """Determine if we should call tools or extract final content."""
-        messages = state.get("messages", [])
-        if not messages:
-            return "extract_content"
+    # ------------------------------------------------------------------
+    # Graph nodes
+    # ------------------------------------------------------------------
 
-        last_message = messages[-1]
+    def _plan_node(self, state: SectionWriterState) -> dict:
+        """Decide whether any charts should be generated for this section."""
+        prompt = self.planner_template.render(
+            cur_section=state.get("cur_section", ""),
+            section_description=state.get("section_description", ""),
+            source_content=state.get("source_content", ""),
+            date=get_today_str(),
+        )
 
-        # Check for tool calls
-        tool_calls = []
-        if hasattr(last_message, "tool_calls"):
-            tool_calls = getattr(last_message, "tool_calls", [])
-        elif isinstance(last_message, dict):
-            tool_calls = last_message.get("tool_calls", [])
-        elif hasattr(last_message, "additional_kwargs"):
-            tool_calls = last_message.additional_kwargs.get("tool_calls", [])
+        structured_model = self.model.with_structured_output(SectionChartPlan)
 
-        if tool_calls:
-            return "tools"
-        return "extract_content"
+        try:
+            plan = structured_model.invoke([SystemMessage(content=prompt)])
+            charts = [spec.model_dump() for spec in plan.charts]
+        except Exception as e:
+            # Planner failures are non-fatal — proceed with no charts.
+            print(f"Chart planning failed, proceeding without charts: {e}")
+            charts = []
 
-    def _extract_content(self, state: dict) -> dict:
-        """Extract the final section content from the last AI message."""
-        messages = state.get("messages", [])
-        content = ""
+        return {"chart_plan": charts}
 
-        # Find the last AI message that contains the section content
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and msg.content:
-                # Skip messages that only contain tool calls
-                tool_calls = getattr(msg, "tool_calls", [])
-                if not tool_calls and msg.content:
-                    content = msg.content
-                    break
+    def _route_after_plan(
+        self, state: SectionWriterState
+    ) -> Literal["charts", "writer"]:
+        """Conditional edge: skip the charts node when nothing is planned."""
+        return "charts" if state.get("chart_plan") else "writer"
 
+    def _charts_node(self, state: SectionWriterState) -> dict:
+        """Generate each planned chart; keep only the successful ones.
+
+        The planner stored each chart as a dict (via `model_dump`), so we
+        reconstruct the `ChartParams` object here before handing it to the
+        chart generator. Any chart that fails validation or generation is
+        silently dropped — the writer never hears about failures.
+        """
+        chart_plan: list[dict] = state.get("chart_plan", []) or []
+        successful: list[dict] = []
+
+        for spec in chart_plan:
+            chart_name = spec.get("chart_name", "")
+            chart_purpose = spec.get("chart_purpose", "")
+            chart_params_dict = spec.get("chart_params") or {}
+
+            if not chart_name or not chart_params_dict:
+                continue
+
+            try:
+                chart_params = ChartParams(**chart_params_dict)
+            except Exception as e:
+                print(
+                    f"Chart '{chart_name}' skipped: invalid params: {e}"
+                )
+                continue
+
+            try:
+                result = generate_chart(
+                    chart_name=chart_name,
+                    chart_params=chart_params,
+                )
+            except Exception as e:
+                print(f"Chart '{chart_name}' generation raised: {e}")
+                continue
+
+            if result.success and result.image_markdown:
+                successful.append(
+                    {
+                        "chart_name": chart_name,
+                        "chart_purpose": chart_purpose,
+                        "image_markdown": result.image_markdown,
+                    }
+                )
+            else:
+                print(
+                    f"Chart '{chart_name}' skipped: "
+                    f"{result.error or 'unknown error'}"
+                )
+
+        return {"successful_charts": successful}
+
+    def _writer_node(self, state: SectionWriterState) -> dict:
+        """Write the final section. Single LLM call, no tools bound."""
+        system_prompt = self.system_template.render()
+        human_message = self.human_template.render(
+            research_brief=state.get("research_brief", ""),
+            section_names=state.get("section_names", ""),
+            cur_section=state.get("cur_section", ""),
+            section_description=state.get("section_description", ""),
+            previous_section=state.get("previous_section", ""),
+            source_content=state.get("source_content", ""),
+            successful_charts=state.get("successful_charts", []),
+            date=get_today_str(),
+        )
+
+        response = self.model.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=human_message),
+            ]
+        )
+
+        content = self._msg_text(response).strip()
         return {"section_content": content, "is_complete": True}
 
-    def build_agent_graph(self):
-        """Build the section writer agent graph."""
-        agent_builder = StateGraph(dict)
+    # ------------------------------------------------------------------
+    # Graph builder
+    # ------------------------------------------------------------------
 
-        agent_builder.add_node("llm_call", self._llm_call)
-        agent_builder.add_node("tools", self.tool_node)
-        agent_builder.add_node("extract_content", self._extract_content)
-
-        agent_builder.add_edge(START, "llm_call")
-        agent_builder.add_conditional_edges(
-            "llm_call",
-            self._should_continue,
-            {
-                "tools": "tools",
-                "extract_content": "extract_content",
-            },
+    def _build_graph(self):
+        builder = StateGraph(
+            SectionWriterState,
+            output_schema=SectionWriterOutputState,
         )
-        agent_builder.add_edge("tools", "llm_call")
-        agent_builder.add_edge("extract_content", END)
+        builder.add_node("plan", self._plan_node)
+        builder.add_node("charts", self._charts_node)
+        builder.add_node("writer", self._writer_node)
 
-        return agent_builder.compile()
+        builder.add_edge(START, "plan")
+        builder.add_conditional_edges(
+            "plan",
+            self._route_after_plan,
+            {"charts": "charts", "writer": "writer"},
+        )
+        builder.add_edge("charts", "writer")
+        builder.add_edge("writer", END)
+
+        return builder.compile()
+
+    def build_agent_graph(self):
+        """Return the compiled graph (kept for API compatibility)."""
+        return self._graph
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _msg_text(msg: Any) -> str:
+        """Flatten a message's content into a plain string."""
+        raw = getattr(msg, "content", None)
+        if isinstance(raw, str):
+            return raw
+        if isinstance(raw, list):
+            parts: list[str] = []
+            for p in raw:
+                if isinstance(p, str):
+                    parts.append(p)
+                elif isinstance(p, dict) and "text" in p:
+                    parts.append(str(p.get("text", "")))
+            return "".join(parts)
+        return "" if raw is None else str(raw)
+
+    # ------------------------------------------------------------------
+    # Public entry point
+    # ------------------------------------------------------------------
 
     def write_section(
         self,
@@ -122,51 +291,40 @@ class SectionWriterAgent:
         previous_section: str,
         source_content: str,
     ) -> str:
-        """
-        Write a section of the research report.
+        """Write a section of the research report.
 
         Args:
-            research_brief: The original research instruction
-            section_names: List of all section names in order
-            cur_section: Name of the current section to write
-            section_description: Writing instructions for this section
-            previous_section: Text of the previous section for style consistency
-            source_content: Source material for this section
+            research_brief: The original research instruction.
+            section_names: List of all section names in order.
+            cur_section: Name of the current section to write.
+            section_description: Writing instructions for this section.
+            previous_section: Text of the previous section for style consistency.
+            source_content: Source material for this section.
 
         Returns:
-            The written section content in markdown format
+            The written section content in markdown format, guaranteed to
+            start with `# {cur_section}` when any content was produced.
         """
-        # Build system prompt
-        system_prompt = self.system_template.render()
-
-        # Build human message with section details
-        human_message = self.human_template.render(
-            research_brief=research_brief,
-            section_names=section_names,
-            cur_section=cur_section,
-            section_description=section_description,
-            previous_section=previous_section,
-            source_content=source_content,
-            date=get_today_str(),
-        )
-
-        # Build and run the agent
-        agent = self.build_agent_graph()
-
+        # Only the caller-supplied context fields are set here. Internal
+        # channels (chart_plan, successful_charts, section_content,
+        # is_complete) are written by the nodes themselves. This matches
+        # how the other subgraphs in the project are invoked (see
+        # SupervisorResearchAgent.supervisor_subgraph, ResearchWriterAgent,
+        # etc.).
         initial_state = {
-            "messages": [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=human_message),
-            ],
-            "section_content": "",
-            "is_complete": False,
+            "research_brief": research_brief,
+            "section_names": section_names,
+            "cur_section": cur_section,
+            "section_description": section_description,
+            "previous_section": previous_section,
+            "source_content": source_content,
         }
 
-        result = agent.invoke(initial_state)
-        content = result.get("section_content", "")
+        result = self._graph.invoke(initial_state)
+        content = (result.get("section_content") or "").strip()
 
-        # Ensure section starts with proper heading
-        if content and not content.strip().startswith("#"):
+        # Guarantee the section starts with its heading.
+        if content and not content.lstrip().startswith("# "):
             content = f"# {cur_section}\n\n{content}"
 
         return content

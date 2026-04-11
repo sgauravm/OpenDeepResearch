@@ -86,7 +86,7 @@ def main():
 
     agent = ResearchWriterAgent(
         planner_reasoning="medium",
-        writer_reasoning="low",
+        writer_reasoning="medium",
     ).build_agent_graph()
 
     state = {

@@ -82,7 +82,7 @@ class ResearchWriterAgent:
     def __init__(
         self,
         planner_reasoning: Literal["low", "medium", "high"] = "medium",
-        writer_reasoning: Literal["low", "medium", "high"] = "low",
+        writer_reasoning: Literal["low", "medium", "high"] = "medium",
     ):
         # Base model without structured output; schema is bound dynamically in planner_node
         # from research_notes keys so source_file_name_list uses Literal[valid_filenames]
