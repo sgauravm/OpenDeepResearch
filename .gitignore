@@ -117,3 +117,4 @@ mlruns/
 .claude
 CLAUDE.md
 notebooks/
+temp/
